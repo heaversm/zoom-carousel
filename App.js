@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { AppRegistry, Animated, Easing, View, StyleSheet, Image, Dimensions, ScrollView, TouchableOpacity } from 'react-native'
+import { AppRegistry, Animated, Easing, View, StyleSheet, Image, Dimensions, ScrollView, TouchableOpacity, Text } from 'react-native'
 
 const deviceWidth = Dimensions.get('window').width
 const deviceHeight = Dimensions.get('window').height
@@ -25,7 +25,7 @@ class ZoomView extends Component {
     minimumZoomScale: 1,
     zoomed: false,
     zoomEnabled: false,
-    zoomHeight: deviceHeight,
+    zoomHeight: 219,
     zoomWidth: deviceWidth,
   }
 
@@ -61,15 +61,36 @@ class ZoomView extends Component {
 
       this.scrollResponderRef.scrollResponderHandleTouchEnd = (event) => {
         if (this.props.zoomed) {
-          return
+          this.imageRef.measure((ox, oy, width, height, px, py) => {
+            if (width <= this.props.zoomWidth) {
+              //this.props.onZoomClosePress() //MH TODO: go back to isolated carousel
+              this.props.onZoomExit()
+              return
+            }
+            else {
+              return
+            }
+          })
         }
-        const currentY = event.nativeEvent.locationY
-        const scrollYDistance = Math.abs(this.state.startY - currentY)
-        //if we have swiped further up or down than the threshold distance and we're not zooming on an image, dismiss the isolated carousel mode
-        if (scrollYDistance > DISMISS_MODAL_THRESHOLD) {
-          this.props.onZoomClosePress()
+        else {
+          const isZoom = event.nativeEvent.touches.length > 1 ? true : false
+
+          if (!isZoom) {
+            const currentY = event.nativeEvent.locationY
+            const scrollYDistance = Math.abs(this.state.startY - currentY)
+            //if we have swiped further up or down than the threshold distance and we're not zooming on an image, dismiss the isolated carousel mode
+            if (scrollYDistance > DISMISS_MODAL_THRESHOLD) {
+              this.props.onZoomClosePress()
+            }
+          }
         }
       }
+    }
+  }
+
+  setImageRef = node => {
+    if (node) {
+      this.imageRef = node
     }
   }
 
@@ -99,23 +120,27 @@ class ZoomView extends Component {
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         ref={this.setZoomRef}
-        //scrollEnabled={this.props.zoomEnabled} //prevents you from panning on image
+        scrollEnabled={this.props.zoomEnabled} //prevents you from panning on image
         scrollEventThrottle={20}
         style={{
           overflow: 'visible',
-          height: 219,
         }}
       >
         <TouchableOpacity
           onPress={this.handleZoomViewPress}
+          flexGrow={1}
+          flex={1}
         >
           <Image
             source={this.props.source}
-            //ratioGrow
+            //flexGrow={1}
+            width={deviceWidth}
+            aspectRatio={1.716}
             style={{
               overflow: 'visible',
-              width: deviceWidth
+              //width: deviceWidth,
             }}
+            ref={this.setImageRef}
           />
         </TouchableOpacity>
       </ScrollView>
@@ -131,6 +156,11 @@ export default class App extends Component {
   //ZOOM VIEW
   animZoomVal = new Animated.Value(0)
 
+  animInverseZoomVal = this.animZoomVal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  })
+
   animValUpTiming = Animated.timing(this.animZoomVal, {
     toValue: 1,
     duraton: 300,
@@ -143,7 +173,7 @@ export default class App extends Component {
   })
   animTranslateY = this.animZoomVal.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 150],
+    outputRange: [0, 175],
   })
 
   //SCROLLBAR
@@ -182,7 +212,6 @@ export default class App extends Component {
   })
 
   state = {
-    scrollEnabled: true,
     zoomEnabled: false,
     zoomed: false,
   }
@@ -208,7 +237,15 @@ export default class App extends Component {
     }
   }
 
-  renderSliderImage = (image, i) => {
+  handleZoomExit = () => {
+    if (this.state.zoomed) {
+      this.setState({ zoomed: false, zoomEnabled: true })
+      this.animScrollOpacityUpTiming.start()
+      this.animCloseOpacityUpTiming.start()
+    }
+  }
+
+  renderZoomView = (image, i) => {
     return (
       <ZoomView
         key={i}
@@ -217,6 +254,7 @@ export default class App extends Component {
         zoomed={this.state.zoomed}
         onZoomEnabled={this.handleZoomEnabled}
         onZoomClosePress={this.handleZoomClosePress}
+        onZoomExit={this.handleZoomExit}
         onZoomed={this.handleZoomed}
         index={i}
       />
@@ -227,17 +265,39 @@ export default class App extends Component {
 
     return (
       <View
-        style={styles.container}
+        style={{
+          flex: 1,
+          flexGrow: 1,
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          marginTop: 40,
+        }}
       >
+        <Animated.View
+          style={{
+            opacity: this.animInverseZoomVal,
+            paddingBottom: 20,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 18,
+            }}
+          >
+            Title
+          </Text>
+        </Animated.View>
         <Animated.View
           style={{
             transform: [
               { translateY: this.animTranslateY },
             ],
             height: 219,
+            zIndex: 10,
           }}
         >
           <Animated.ScrollView
+            grow
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
@@ -245,15 +305,16 @@ export default class App extends Component {
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: this.animScrollXVal } } }]
             )}
-            scrollEnabled={this.state.scrollEnabled}
+            scrollEnabled={!this.state.zoomed}
             style={{
               overflow: 'visible',
-
+              //flexGrow: 1,
+              //flex: 1,
             }}
           >
             {
               images.map((image, i) => {
-                return (this.renderSliderImage(image, i))
+                return (this.renderZoomView(image, i))
               })
             }
           </Animated.ScrollView>
@@ -275,7 +336,6 @@ export default class App extends Component {
                   backgroundColor: '#111111',
                   width: deviceWidth / images.length,
                   height: 5,
-                  marginHorizontal: -0.1,
                   transform: [
                     {
                       translateX: this.scrollXVal,
@@ -286,19 +346,46 @@ export default class App extends Component {
             </Animated.View>
           </Animated.View>
         </Animated.View>
+        <Animated.View
+          style={{
+            opacity: this.animInverseZoomVal,
+            marginTop: 50,
+            alignSelf: 'flex-start',
+            paddingLeft: 20,
+            paddingRight: 20,
+          }}
+        >
+          <Text
+            style={{
+              marginBottom: 20,
+              fontSize: 16,
+              backgroundColor: 'transparent'
+            }}
+          >
+            Subtitle
+          </Text>
+          <Text
+            style={{
+              backgroundColor: 'transparent'
+            }}
+          >
+            Aliquam in velit in ligula gravida cursus at ut lacus. Vestibulum luctus eleifend lorem, et tincidunt mi. Nam semper turpis in dolor sollicitudin elementum. Maecenas ornare felis ultricies congue maximus. Proin id luctus eros, nec varius libero. Integer at tincidunt augue. Aenean non ex dignissim, lacinia nibh id, convallis odio. Quisque consequat blandit elit eu pulvinar. Pellentesque hendrerit rhoncus magna, feugiat accumsan metus gravida sed. Integer ut mollis felis. Ut elementum nisi a libero imperdiet, eget volutpat ex sagittis. Morbi eu placerat nisi, et bibendum sapien.
+          </Text>
+        </Animated.View>
         {
           this.state.zoomEnabled &&
           (
             <Animated.View
               style={{
                 position: 'absolute',
-                top: 44,
+                top: 20,
                 right: 20,
                 opacity: this.animCloseOpacityVal,
               }}
             >
               <TouchableOpacity
                 onPress={this.handleZoomClosePress}
+                hitSlop={{ top: 20, left: 20, right: 20, bottom: 20 }}
               >
                 <Image
                   source={require('./assets/images/close.png')}
@@ -314,12 +401,3 @@ export default class App extends Component {
 }
 
 AppRegistry.registerComponent('App', () => App);
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginTop: 40,
-  },
-})
