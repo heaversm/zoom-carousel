@@ -60,6 +60,7 @@ class ZoomView extends Component {
       }
 
       this.scrollResponderRef.scrollResponderHandleTouchEnd = (event) => {
+        console.log('end')
         if (this.props.zoomed) {
           this.imageRef.measure((ox, oy, width, height, px, py) => {
             if (width <= this.props.zoomWidth) {
@@ -113,7 +114,7 @@ class ZoomView extends Component {
   render() {
     return (
       <ScrollView
-        contentContainerStyle={{ alignItems: 'center', justifyContent: 'center' }}
+        contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', }}
         centerContent //centers content when zoom is less than scroll view bounds 
         maximumZoomScale={this.props.zoomEnabled ? this.props.maximumZoomScale : 1} //setting to 1 disallows zoom
         minimumZoomScale={this.props.minimumZoomScale}
@@ -121,7 +122,7 @@ class ZoomView extends Component {
         showsVerticalScrollIndicator={false}
         ref={this.setZoomRef}
         scrollEnabled={this.props.zoomEnabled} //prevents you from panning on image
-        scrollEventThrottle={20}
+        scrollEventThrottle={10}
         style={{
           overflow: 'visible',
         }}
@@ -136,10 +137,6 @@ class ZoomView extends Component {
             //flexGrow={1}
             width={deviceWidth}
             aspectRatio={1.716}
-            style={{
-              overflow: 'visible',
-              //width: deviceWidth,
-            }}
             ref={this.setImageRef}
           />
         </TouchableOpacity>
@@ -256,6 +253,7 @@ export default class App extends Component {
         onZoomClosePress={this.handleZoomClosePress}
         onZoomExit={this.handleZoomExit}
         onZoomed={this.handleZoomed}
+        translateY={this.animTranslateY}
         index={i}
       />
     )
@@ -301,15 +299,13 @@ export default class App extends Component {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            scrollEventThrottle={20}
+            scrollEventThrottle={10}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: this.animScrollXVal } } }]
             )}
             scrollEnabled={!this.state.zoomed}
             style={{
               overflow: 'visible',
-              //flexGrow: 1,
-              //flex: 1,
             }}
           >
             {
